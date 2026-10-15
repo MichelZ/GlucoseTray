@@ -35,7 +35,7 @@ public class GlucoseReader(IReadStrategyFactory strategyFactory, ILogger<Glucose
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to read latest glucose value.");
+            SafeDiagnostics.LogFailure(logger, LogLevel.Error, DiagnosticOperation.ReadGlucose, ex);
             if (ex is GlucoseReadException { CanUseCachedReading: false } ||
                 (ex is GlucoseReadException { SubjectId: not null } selected && selected.SubjectId != _latestReading?.SubjectId) ||
                 !CurrentIdentityMatches())

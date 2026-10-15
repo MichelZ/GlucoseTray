@@ -17,6 +17,14 @@ Only the follower email remains in `appsettings.json`, to select the saved crede
 
 If an older settings file contains `LibreLinkUpPassword`, startup migrates its plaintext or DPAPI-encrypted value into Credential Manager, then removes the field. A failed vault write leaves the original file intact. Migration does not erase copies already retained by editors or backups.
 
+## Diagnostic privacy
+
+Application logs contain only fixed operation/failure categories, GET/POST/OTHER, and numeric HTTP status codes. Request URLs, headers, bodies, response reason phrases/bodies, account settings, and raw exceptions (including inner exceptions) are excluded. Factory HTTP logging is removed for both clients, including at Trace level. Regression tests inject synthetic credentials into those paths and inspect both rendered logs and structured fields.
+
+All glucose requests require HTTPS without credentials embedded in the URL, and automatic HTTP redirects are disabled. LibreLinkUp's bounded region selection still uses its fixed HTTPS host allowlist. For Nightscout, configure the final HTTPS service address; plain HTTP and endpoints requiring redirects fail rather than sending credentials onward.
+
+The LibreLinkUp password remains in Windows Credential Manager and is sent only in the required HTTPS authentication request to an allowed Abbott host. Authentication necessarily places passwords/tokens in process memory. These controls do not protect against a compromised Windows account, a debugger/crash dump, or logging performed by the remote service. Earlier versions could log Nightscout access tokens or Dexcom session IDs in request URLs on failure; do not share logs from older builds without inspecting them.
+
 ## Connection and display settings
 
 Only non-password settings belong in `appsettings.json`:
@@ -50,6 +58,6 @@ Source UTC measurement time is preserved. An outage for the same patient can ret
 
 Glucose alerts are **Windows notification balloons on alert-level transitions**, not repeating audible alarms. Windows settings affect visibility and sound. Keep official Libre alarms enabled.
 
-The ZIP is an unsigned local trial, not an upstream release. The 163-test suite includes production-DI cloud scenarios, a synthetic Windows Credential Manager round-trip, actual native icon colors and handle lifetime, background-thread display refresh, widget reopen behavior, and stale-data status checks. Live Swiss account login and shared-connection polling have been verified locally. Native widget states were rendered and inspected; Windows notification sound, sleep/resume, and mixed-DPI/multiple-monitor behavior still need manual validation.
+The ZIP is an unsigned local trial, not an upstream release. The 180-test suite includes secret-disclosure regressions, production-DI cloud scenarios, a synthetic Windows Credential Manager round-trip, actual native icon colors and handle lifetime, background-thread display refresh, widget reopen behavior, and stale-data status checks. Live Swiss account login and shared-connection polling have been verified locally. Native widget states were rendered and inspected; Windows notification sound, sleep/resume, and mixed-DPI/multiple-monitor behavior still need manual validation.
 
 The unofficial API follows the protocol in the [Nightscout LibreLinkUp uploader](https://github.com/timoschlueter/nightscout-librelink-up); compatibility can change. Complete consent and terms in the official app. GlucoseTray does not accept them or change sensor settings. Keep passwords, tokens, patient identifiers, and personal readings out of shared logs.

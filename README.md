@@ -33,7 +33,7 @@ Always verify the time of the last reading by hovering over the tray icon or dou
 GlucoseTray can read your glucose from one of three places. Pick whichever you already use:
 
 - **Dexcom** — Sign in with the same username and password you use for the Dexcom Share/Follow app. Make sure Share is turned on in your Dexcom app.
-- **Nightscout** — If you run your own Nightscout site, enter its web address and access token.
+- **Nightscout** — If you run your own Nightscout site, enter its final HTTPS web address and access token. Plain HTTP, embedded URL credentials, and automatic redirects are rejected to protect credentials.
 - **LibreLinkUp** — Read shared FreeStyle Libre readings directly from Abbott's cloud using a follower account. No Nightscout server is required. See [LibreLinkUp setup](LIBRELINKUP.md).
 
 ## Settings Reference
@@ -45,7 +45,7 @@ You can change these in the **Settings** window or by editing `appsettings.json`
 | `DataSource` | Where readings come from: `Dexcom`, `Nightscout`, or `LibreLinkUp`. |
 | `DexcomServer` | Your Dexcom region: `DexcomShare1` (US), `DexcomShare2`, or `DexcomInternational` (outside the US). |
 | `DexcomUsername` / `DexcomPassword` | Your Dexcom Share login. |
-| `NightscoutUrl` / `NightscoutToken` | Your Nightscout site address and access token. |
+| `NightscoutUrl` / `NightscoutToken` | Your final HTTPS Nightscout address (no redirects) and access token. |
 | `LibreLinkUpUsername` | Follower email selected by the sign-in dialog; password is in Windows Credential Manager. |
 | `LibreLinkUpRegion` | Initial API region (default `EU`); account region redirects are followed. |
 | `LibreLinkUpPatientId` | Required when choosing among multiple shared connections. |
@@ -80,6 +80,8 @@ You can change these in the **Settings** window or by editing `appsettings.json`
 ## Your Privacy
 
 Your LibreLinkUp password is entered through a masked dialog and saved directly in Windows Credential Manager, not `appsettings.json`. Use the tray's LibreLinkUp sign-out action to remove the active account's saved credential. Cloud session tokens stay in memory. Older LibreLinkUp passwords are migrated out of settings on startup. Dexcom passwords and Nightscout tokens retain their existing Windows DPAPI protection in the settings file.
+
+Logs exclude request URLs, headers, bodies, settings, and raw exception text. They record only fixed diagnostic categories, allowed HTTP methods, and numeric statuses, including when Trace logging is enabled. Both HTTP clients require HTTPS and do not follow HTTP redirects. See [diagnostic privacy and limits](LIBRELINKUP.md#diagnostic-privacy).
 
 ## Troubleshooting & FAQ
 
