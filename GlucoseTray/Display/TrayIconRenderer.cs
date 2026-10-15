@@ -34,7 +34,8 @@ public static class TrayIconRenderer
         using var transform = new Matrix(scaleX, 0, 0, scaleY,
             left - bounds.Left * scaleX, inset - bounds.Top * scaleY);
         glyphs.Transform(transform);
-        using var brush = new SolidBrush(ToColor(display.Color));
+        var unavailable = display.TimestampUtc == DateTime.MinValue || display.IsStale || display.ConnectionError is not null;
+        using var brush = new SolidBrush(unavailable ? Color.FromArgb(164, 174, 190) : ToColor(display.Color));
         // A slight expansion keeps condensed strokes visible at 16px without ClearType fringes.
         using var stroke = new Pen(brush, size / 40f) { LineJoin = LineJoin.Round };
         graphics.DrawPath(stroke, glyphs);
@@ -66,9 +67,11 @@ public static class TrayIconRenderer
     {
         IconTextColor.White => Color.White,
         IconTextColor.Black => Color.Black,
-        IconTextColor.Yellow => Color.Yellow,
+        IconTextColor.Green => Color.FromArgb(91, 223, 171),
+        IconTextColor.DarkGreen => Color.SeaGreen,
+        IconTextColor.Yellow => Color.FromArgb(255, 207, 86),
         IconTextColor.Gold => Color.DarkGoldenrod,
-        IconTextColor.Red => Color.Red,
+        IconTextColor.Red => Color.FromArgb(255, 106, 117),
         _ => Color.Black,
     };
 }
