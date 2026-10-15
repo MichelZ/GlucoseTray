@@ -10,6 +10,7 @@ public class AppSettings
 
     [JsonPropertyOrder(1)]
     public bool IsDarkMode { get; set; } = false;
+    public bool ShowGlucoseWidget { get; set; } = false;
     [JsonPropertyOrder(2)]
     public int MinutesUntilStale { get; set; } = 15;
     [JsonPropertyOrder(3)]

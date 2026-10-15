@@ -18,12 +18,29 @@ public class GlucoseDisplayMapper(IOptionsMonitor<AppSettings> options) : IGluco
         {
             ConnectionError = reading.ConnectionError,
             DisplayValue = GetDisplayValue(reading),
+            WidgetValue = options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mg ?
+                reading.MgValue.ToString(CultureInfo.InvariantCulture) : reading.MmolValue.ToString("0.0", CultureInfo.InvariantCulture),
             Color = options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mg ? GetColor(reading.MgValue) : GetColor(reading.MmolValue),
             FontSize = GetFontSize(reading),
             TimestampUtc = reading.TimestampUtc,
             Trend = reading.Trend,
             IsStale = reading.TimestampUtc < DateTime.UtcNow.AddMinutes(-options.CurrentValue.MinutesUntilStale),
+            RangeLabel = GetRangeLabel(reading),
+            UnitLabel = options.CurrentValue.DisplayUnitType == GlucoseUnitType.Mg ? "mg/dL" : "mmol/L",
+            MinutesUntilStale = options.CurrentValue.MinutesUntilStale,
         };
+    }
+
+    private string GetRangeLabel(GlucoseReading reading)
+    {
+        var s = options.CurrentValue;
+        var mg = s.DisplayUnitType == GlucoseUnitType.Mg;
+        var value = mg ? reading.MgValue : reading.MmolValue;
+        if (value <= (mg ? s.CriticalLowMgThreshold : s.CriticalLowMmolThreshold)) return "Critical low";
+        if (value <= (mg ? s.LowMgThreshold : s.LowMmolThreshold)) return "Low";
+        if (value >= (mg ? s.CriticalHighMgThreshold : s.CriticalHighMmolThreshold)) return "Critical high";
+        if (value >= (mg ? s.HighMgThreshold : s.HighMmolThreshold)) return "High";
+        return "In range";
     }
 
     private int GetFontSize(GlucoseReading reading)

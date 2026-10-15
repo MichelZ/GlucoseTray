@@ -42,6 +42,10 @@ With one connection, leave `LibreLinkUpPatientId` empty. With multiple connectio
 
 ## Status, alerts, and limits
 
+Right-click the tray number and select **Show glucose widget** for a draggable, always-on-top reading with units, trend, and age. Use its **×** to hide it; the tray menu brings it back. Visibility is saved as `ShowGlucoseWidget`; the initial setting is off. The widget starts near the bottom-right of the primary screen and can be dragged to another monitor.
+
+The widget uses green for **In range**, amber for **Low/High**, red for **Critical low/high**, and gray for **Stale reading**, **Connection problem**, or missing data. Text labels distinguish low from high. These states use the existing configured thresholds. The tray retains its existing white/black, yellow/gold, and red colors. Reading age updates every second; the widget turns stale without needing another successful poll and hides the trend arrow while disconnected or stale.
+
 Source UTC measurement time is preserved. An outage for the same patient can retain the last reading with its original timestamp and an error status. It ages into the stale display; polling does not make it fresh. Failed refreshes do not emit glucose alerts. Setup errors appear on hover and double-click, with one Windows notification per distinct error; recovery clears the error.
 
 Glucose alerts are **Windows notification balloons on alert-level transitions**, not repeating audible alarms. Windows settings affect visibility and sound. Keep official Libre alarms enabled.

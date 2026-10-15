@@ -1,6 +1,8 @@
 ﻿using GlucoseTray.Enums;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Text.Json.Nodes;
+using Microsoft.Extensions.Options;
 
 namespace GlucoseTray.Display;
 
@@ -20,11 +22,17 @@ public class NotificationIcon : ITrayIcon
     private readonly NotifyIcon _trayIcon;
     private Icon? _currentIcon;
     private GlucoseDisplay? _latestGlucose;
+    private readonly Control _dispatcher = new();
+    private GlucoseWidget? _widget;
+    private bool _widgetEnabled;
+    private ToolStripMenuItem? _widgetMenu;
 
     private readonly ILibreLinkUpSignIn? _signIn;
 
-    public NotificationIcon(ILibreLinkUpSignIn? signIn = null)
+    public NotificationIcon(ILibreLinkUpSignIn? signIn = null, IOptionsMonitor<AppSettings>? options = null)
     {
+        _ = _dispatcher.Handle;
+        _widgetEnabled = options?.CurrentValue.ShowGlucoseWidget ?? false;
         _signIn = signIn;
         _trayIcon = new NotifyIcon
         {
@@ -39,7 +47,43 @@ public class NotificationIcon : ITrayIcon
 
     public void ClearMenu() => _trayIcon?.ContextMenuStrip?.Items.Clear();
     public void AddAutoRunMenu(bool isAlreadyOn, EventHandler toggleCallback) => _trayIcon?.ContextMenuStrip?.Items.Add(new ToolStripMenuItem(isAlreadyOn ? "Disable auto-start" : "Run on startup", null, toggleCallback));
-    public void AddSettingsMenu() => _trayIcon?.ContextMenuStrip?.Items.Add(new ToolStripMenuItem("Settings", null, Settings));
+    public void AddSettingsMenu()
+    {
+        _trayIcon.ContextMenuStrip?.Items.Add(new ToolStripMenuItem("Settings", null, Settings));
+        _widgetMenu = new ToolStripMenuItem("Show glucose widget") { Checked = _widgetEnabled };
+        _widgetMenu.Click += (_, _) => SetWidgetVisible(!_widgetEnabled);
+        _trayIcon.ContextMenuStrip?.Items.Add(_widgetMenu);
+    }
+
+    private void SetWidgetVisible(bool visible)
+    {
+        _widgetEnabled = visible;
+        if (_widgetMenu is not null) _widgetMenu.Checked = visible;
+        UpdateWidget();
+        try
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, AppSettings.FileName);
+            var settings = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+            settings[nameof(AppSettings.ShowGlucoseWidget)] = visible;
+            File.WriteAllText(path, settings.ToJsonString(new() { WriteIndented = true }));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+        {
+            ShowNotification("The widget visibility could not be saved; it applies for this session only.");
+        }
+    }
+
+    private void UpdateWidget()
+    {
+        if (!_widgetEnabled) { _widget?.Hide(); return; }
+        if (_widget is null)
+        {
+            _widget = new GlucoseWidget();
+            _widget.HideRequested += (_, _) => SetWidgetVisible(false);
+        }
+        if (_latestGlucose is not null) _widget.UpdateReading(_latestGlucose);
+        if (!_widget.Visible) _widget.Show();
+    }
     public void AddExitMenu() => _trayIcon?.ContextMenuStrip?.Items.Add(new ToolStripMenuItem("Exit", null, Exit));
 
     public void AddLibreLinkUpMenu()
@@ -61,6 +105,8 @@ public class NotificationIcon : ITrayIcon
     public void Dispose()
     {
         _trayIcon.Dispose();
+        _widget?.Dispose();
+        _dispatcher.Dispose();
         _currentIcon?.Dispose();
         _currentIcon = null;
     }
@@ -74,10 +120,17 @@ public class NotificationIcon : ITrayIcon
 
     public void RefreshIcon(GlucoseDisplay display)
     {
+        if (_dispatcher.IsDisposed) return;
+        if (_dispatcher.InvokeRequired)
+        {
+            _dispatcher.BeginInvoke(() => RefreshIcon(display));
+            return;
+        }
         _latestGlucose = display;
         var status = display.GetDisplayMessage(DateTime.UtcNow);
         _trayIcon.Text = status.Length <= 63 ? status : status[..60] + "...";
         CreateTextIcon(display);
+        UpdateWidget();
     }
 
     private void CreateTextIcon(GlucoseDisplay display)
