@@ -46,6 +46,10 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ILib
         {
             throw new GlucoseReadException("LibreLinkUp sign-in failed. Check your follower credentials and sign in to the official LibreLinkUp app.");
         }
+        catch (HttpRequestException ex) when (ex.StatusCode.HasValue)
+        {
+            throw new GlucoseReadException($"LibreLinkUp request was refused or failed (HTTP {(int)ex.StatusCode.Value}). Check the official app and your internet connection.");
+        }
         catch (Exception)
         {
             throw new GlucoseReadException("LibreLinkUp could not update. Check your internet connection and sign in to the official LibreLinkUp app to complete any pending setup.");
@@ -134,6 +138,8 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ILib
     {
         using var request = new HttpRequestMessage(method, $"https://{host}{path}");
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        // Abbott's gateway rejects .NET requests with no User-Agent before they reach the API.
+        request.Headers.UserAgent.ParseAdd("GlucoseTray/1.0");
         request.Headers.Add("product", "llu.ios");
         request.Headers.Add("version", identity.Version);
         if (authenticated)

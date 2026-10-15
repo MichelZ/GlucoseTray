@@ -93,6 +93,8 @@ public class LibreLinkUpClientTests
             Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("test-password"));
             Assert.That(login.Headers["product"], Is.EqualTo("llu.ios"));
             Assert.That(login.Headers["version"], Is.EqualTo("4.16.0"));
+            Assert.That(login.Headers["User-Agent"], Is.EqualTo("GlucoseTray/1.0"));
+            Assert.That(read.Headers["User-Agent"], Is.EqualTo("GlucoseTray/1.0"));
             Assert.That(login.Headers.ContainsKey("Authorization"), Is.False);
             Assert.That(read.Headers["Authorization"], Is.EqualTo("Bearer test-token"));
             Assert.That(read.Headers["account-id"], Is.EqualTo(Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("test-account"))).ToLowerInvariant()));
@@ -137,6 +139,21 @@ public class LibreLinkUpClientTests
         await client.GetLatestGlucoseAsync(Settings());
         await client.GetLatestGlucoseAsync(Settings());
         Assert.That(handler.Requests.Count(r => r.Uri.AbsolutePath == "/llu/auth/login"), Is.EqualTo(2));
+    }
+
+    [Test]
+    public void ShouldExposeForbiddenHttpStatusWithoutResponseBody()
+    {
+        var (client, handler) = Create();
+        for (var i = 0; i < 2; i++)
+            handler.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.Forbidden)
+            {
+                Content = new StringContent("<html>private-do-not-log</html>"),
+            });
+        var error = Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()))!;
+        Assert.That(error.Message, Does.Contain("HTTP 403"));
+        Assert.That(error.ToString(), Does.Not.Contain("private-do-not-log"));
+        Assert.That(handler.Requests, Has.Count.EqualTo(2));
     }
 
     [Test]
