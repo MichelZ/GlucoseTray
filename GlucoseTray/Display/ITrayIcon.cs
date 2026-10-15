@@ -26,11 +26,14 @@ public class NotificationIcon : ITrayIcon
     private GlucoseWidget? _widget;
     private bool _widgetEnabled;
     private ToolStripMenuItem? _widgetMenu;
+    private readonly IWidgetPositionStore _widgetPositions;
 
     private readonly ILibreLinkUpSignIn? _signIn;
 
-    public NotificationIcon(ILibreLinkUpSignIn? signIn = null, IOptionsMonitor<AppSettings>? options = null)
+    public NotificationIcon(ILibreLinkUpSignIn? signIn = null, IOptionsMonitor<AppSettings>? options = null,
+        IWidgetPositionStore? widgetPositions = null)
     {
+        _widgetPositions = widgetPositions ?? new WidgetPositionStore(Path.Combine(AppContext.BaseDirectory, WidgetPositionStore.FileName));
         _ = _dispatcher.Handle;
         _widgetEnabled = options?.CurrentValue.ShowGlucoseWidget ?? false;
         _signIn = signIn;
@@ -78,8 +81,9 @@ public class NotificationIcon : ITrayIcon
         if (!_widgetEnabled) { _widget?.Hide(); return; }
         if (_widget is null)
         {
-            _widget = new GlucoseWidget();
+            _widget = new GlucoseWidget(_widgetPositions);
             _widget.HideRequested += (_, _) => SetWidgetVisible(false);
+            _widget.PositionSaveFailed += (_, _) => ShowNotification("The widget position could not be saved. Check write access to the app folder.");
         }
         if (_latestGlucose is not null) _widget.UpdateReading(_latestGlucose);
         if (!_widget.Visible) _widget.Show();
@@ -104,8 +108,8 @@ public class NotificationIcon : ITrayIcon
 
     public void Dispose()
     {
-        _trayIcon.Dispose();
         _widget?.Dispose();
+        _trayIcon.Dispose();
         _dispatcher.Dispose();
         _currentIcon?.Dispose();
         _currentIcon = null;

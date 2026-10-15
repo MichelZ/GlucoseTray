@@ -9,10 +9,15 @@ public sealed class GlucoseWidget : Form
     private GlucoseDisplay _display = new();
     private readonly System.Windows.Forms.Timer _clock = new() { Interval = 1000 };
     private Point? _dragOrigin;
+    private readonly IWidgetPositionStore? _positionStore;
+    private bool _positionRestored;
+    private bool _disposing;
     public event EventHandler? HideRequested;
+    public event EventHandler? PositionSaveFailed;
 
-    public GlucoseWidget()
+    public GlucoseWidget(IWidgetPositionStore? positionStore = null)
     {
+        _positionStore = positionStore;
         Text = "GlucoseTray widget";
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
@@ -31,6 +36,34 @@ public sealed class GlucoseWidget : Form
     }
 
     protected override bool ShowWithoutActivation => true;
+
+    protected override void OnShown(EventArgs e)
+    {
+        if (_positionStore is not null)
+            Location = WidgetPlacement.KeepVisible(_positionStore.Load() ?? Location, Size,
+                Screen.AllScreens.Select(screen => screen.WorkingArea).ToArray());
+        _positionRestored = true;
+        base.OnShown(e);
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        if (_positionRestored && !Visible && !_disposing) SavePosition();
+        else if (_positionRestored && Visible && _positionStore is not null)
+            Location = WidgetPlacement.KeepVisible(Location, Size,
+                Screen.AllScreens.Select(screen => screen.WorkingArea).ToArray());
+    }
+
+    private void SavePosition()
+    {
+        if (!_positionRestored || _positionStore is null) return;
+        try { _positionStore.Save(Location); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            PositionSaveFailed?.Invoke(this, EventArgs.Empty);
+        }
+    }
 
     public void UpdateReading(GlucoseDisplay display)
     {
@@ -100,8 +133,20 @@ public sealed class GlucoseWidget : Form
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
+        var wasDragging = _dragOrigin is not null;
         _dragOrigin = null;
         Capture = false;
+        if (wasDragging) SavePosition();
+    }
+
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        base.OnMouseCaptureChanged(e);
+        if (!Capture && _dragOrigin is not null)
+        {
+            _dragOrigin = null;
+            SavePosition();
+        }
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -116,7 +161,12 @@ public sealed class GlucoseWidget : Form
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) _clock.Dispose();
+        if (disposing && !_disposing)
+        {
+            _disposing = true;
+            SavePosition();
+            _clock.Dispose();
+        }
         base.Dispose(disposing);
     }
 }

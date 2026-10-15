@@ -12,6 +12,7 @@
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
+widget-position.json
 
 # Build results
 [Dd]ebug/
