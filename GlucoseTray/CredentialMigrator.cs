@@ -34,12 +34,6 @@ public class CredentialMigrator(ICredentialProtector protector) : ICredentialMig
             changed = true;
         }
 
-        if (!string.IsNullOrEmpty(settings.LibreLinkUpPassword) && !protector.IsProtected(settings.LibreLinkUpPassword))
-        {
-            settings.LibreLinkUpPassword = protector.Protect(settings.LibreLinkUpPassword);
-            changed = true;
-        }
-
         if (changed)
             File.WriteAllText(filePath, JsonSerializer.Serialize(settings, AppSettingsJson.SerializerOptions));
 

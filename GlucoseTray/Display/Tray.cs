@@ -33,6 +33,8 @@ public class Tray : ITray
         _icon.ClearMenu();
         _icon.AddAutoRunMenu(_scheduler.HasTaskEnabled(), ToggleAutoRun);
         _icon.AddSettingsMenu();
+        if (_options.CurrentValue?.DataSource == Enums.GlucoseSource.LibreLinkUp)
+            _icon.AddLibreLinkUpMenu();
         _icon.AddExitMenu();
     }
 

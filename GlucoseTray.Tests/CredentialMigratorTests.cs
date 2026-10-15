@@ -24,7 +24,7 @@ public class CredentialMigratorTests
     [Test]
     public void ShouldEncryptPlaintextCredentials()
     {
-        WriteSettings(new AppSettings { DexcomPassword = "pw", NightscoutToken = "tok", LibreLinkUpPassword = "libre-pw" });
+        WriteSettings(new AppSettings { DexcomPassword = "pw", NightscoutToken = "tok" });
         var migrator = new CredentialMigrator(new PrefixProtector());
 
         var changed = migrator.ProtectFile(_filePath);
@@ -35,14 +35,13 @@ public class CredentialMigratorTests
             Assert.That(changed, Is.True);
             Assert.That(result.DexcomPassword, Is.EqualTo("ENC:pw"));
             Assert.That(result.NightscoutToken, Is.EqualTo("ENC:tok"));
-            Assert.That(result.LibreLinkUpPassword, Is.EqualTo("ENC:libre-pw"));
         }
     }
 
     [Test]
     public void ShouldNotRewriteWhenCredentialsAlreadyProtected()
     {
-        WriteSettings(new AppSettings { DexcomPassword = "ENC:pw", NightscoutToken = "ENC:tok", LibreLinkUpPassword = "ENC:libre-pw" });
+        WriteSettings(new AppSettings { DexcomPassword = "ENC:pw", NightscoutToken = "ENC:tok" });
         var migrator = new CredentialMigrator(new PrefixProtector());
 
         var changed = migrator.ProtectFile(_filePath);

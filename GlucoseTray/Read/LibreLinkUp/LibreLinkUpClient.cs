@@ -18,7 +18,7 @@ public interface ILibreLinkUpClient
 /// https://github.com/timoschlueter/nightscout-librelink-up
 /// Tokens are kept in memory and shared between refreshes, not written to settings.
 /// </summary>
-public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICredentialProtector protector) : ILibreLinkUpClient
+public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ILibreLinkUpCredentialStore credentials) : ILibreLinkUpClient
 {
     public const string HttpClientName = "LibreLinkUp";
     private static readonly Dictionary<string, string> Hosts = new(StringComparer.OrdinalIgnoreCase)
@@ -54,10 +54,14 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
 
     private async Task<GlucoseReading> ReadAsync(AppSettings settings)
     {
-        var identity = new SessionIdentity(settings.LibreLinkUpUsername.Trim(), settings.LibreLinkUpPassword,
+        var identity = new SessionIdentity(settings.LibreLinkUpUsername.Trim(), credentials.Revision,
             settings.LibreLinkUpRegion.Trim().ToUpperInvariant(), settings.LibreLinkUpApiVersion.Trim());
-        if (string.IsNullOrWhiteSpace(identity.Username) || string.IsNullOrWhiteSpace(identity.Password))
-            throw new GlucoseReadException("Set LibreLinkUpUsername and LibreLinkUpPassword to your LibreLinkUp follower account credentials.", false);
+        var password = credentials.GetPassword(identity.Username);
+        if (string.IsNullOrWhiteSpace(identity.Username) || string.IsNullOrEmpty(password))
+        {
+            ClearSession();
+            throw new GlucoseReadException("LibreLinkUp is signed out. Right-click the tray icon and choose LibreLinkUp sign in.", false);
+        }
         if (!Hosts.ContainsKey(identity.Region))
             throw new GlucoseReadException("Unsupported LibreLinkUpRegion. See the README for supported region codes.", false);
         if (!Version.TryParse(identity.Version, out _))
@@ -75,7 +79,7 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
             try
             {
                 if (_token is null || _expires <= DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 30)
-                    await LoginAsync(client, identity);
+                    await LoginAsync(client, identity, password);
 
                 using var response = await SendAsync(client, identity, HttpMethod.Get, _host!, "/llu/connections", authenticated: true);
                 var connections = RequireData(response);
@@ -92,7 +96,7 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
         throw new InvalidOperationException("LibreLinkUp authentication failed. Sign in to the official LibreLinkUp app to check your account.");
     }
 
-    private async Task LoginAsync(HttpClient client, SessionIdentity identity)
+    private async Task LoginAsync(HttpClient client, SessionIdentity identity, string password)
     {
         ClearSession();
         var region = identity.Region;
@@ -101,7 +105,7 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
         {
             if (!Hosts.TryGetValue(region, out var host))
                 throw new InvalidOperationException("LibreLinkUp returned an unsupported region. Check your account in the official app.");
-            var body = JsonSerializer.Serialize(new { email = identity.Username, password = protector.Unprotect(identity.Password) });
+            var body = JsonSerializer.Serialize(new { email = identity.Username, password });
             using var response = await SendAsync(client, identity, HttpMethod.Post, host, "/llu/auth/login", body);
             var data = RequireData(response);
             if (data.TryGetProperty("redirect", out var redirect) && redirect.ValueKind == JsonValueKind.True)
@@ -233,5 +237,5 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
         _expires = 0;
     }
 
-    private sealed record SessionIdentity(string Username, string Password, string Region, string Version);
+    private sealed record SessionIdentity(string Username, long CredentialRevision, string Region, string Version);
 }

@@ -16,6 +16,8 @@ public class Program
         if (!File.Exists(filePath))
             CreateDefaultAppSettings(filePath);
 
+        var credentialStore = new WindowsLibreLinkUpCredentialStore();
+        LibreLinkUpAccountSettings.MigrateLegacyPassword(filePath, credentialStore, new DpapiCredentialProtector());
         ProtectCredentialsAtRest(filePath);
 
         var host = Host.CreateDefaultBuilder()
@@ -24,6 +26,10 @@ public class Program
             .Build();
 
         var services = host.Services;
+        var settings = services.GetRequiredService<Microsoft.Extensions.Options.IOptionsMonitor<AppSettings>>().CurrentValue;
+        if (settings.DataSource == GlucoseTray.Enums.GlucoseSource.LibreLinkUp &&
+            string.IsNullOrEmpty(services.GetRequiredService<ILibreLinkUpCredentialStore>().GetPassword(settings.LibreLinkUpUsername)))
+            services.GetRequiredService<ILibreLinkUpSignIn>().ShowDialog();
         var app = services.GetRequiredService<AppWrapper>();
         Application.Run(app);
     }
@@ -34,6 +40,8 @@ public class Program
         services.AddHttpClient(LibreLinkUpClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddSingleton<ILibreLinkUpClient, LibreLinkUpClient>();
+        services.AddSingleton<ILibreLinkUpCredentialStore, WindowsLibreLinkUpCredentialStore>();
+        services.AddSingleton<ILibreLinkUpSignIn, LibreLinkUpSignIn>();
 
         services.AddSingleton<ICredentialProtector, DpapiCredentialProtector>();
         services.AddSingleton<ICredentialMigrator, CredentialMigrator>();

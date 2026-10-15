@@ -46,7 +46,7 @@ You can change these in the **Settings** window or by editing `appsettings.json`
 | `DexcomServer` | Your Dexcom region: `DexcomShare1` (US), `DexcomShare2`, or `DexcomInternational` (outside the US). |
 | `DexcomUsername` / `DexcomPassword` | Your Dexcom Share login. |
 | `NightscoutUrl` / `NightscoutToken` | Your Nightscout site address and access token. |
-| `LibreLinkUpUsername` / `LibreLinkUpPassword` | Your LibreLinkUp follower account login. |
+| `LibreLinkUpUsername` | Follower email selected by the sign-in dialog; password is in Windows Credential Manager. |
 | `LibreLinkUpRegion` | Initial API region (default `EU`); account region redirects are followed. |
 | `LibreLinkUpPatientId` | Required when choosing among multiple shared connections. |
 | `LibreLinkUpApiVersion` | API app-version header (default `4.16.0`). |
@@ -79,7 +79,7 @@ You can change these in the **Settings** window or by editing `appsettings.json`
 
 ## Your Privacy
 
-Your Dexcom password, LibreLinkUp password, and Nightscout token are automatically encrypted inside `appsettings.json`. Encryption uses Windows' built-in protection tied to your Windows user account, which means the saved file only works on your PC under your login. If you change a password or token while the app is running, it's re-encrypted when the app processes the saved settings. LibreLinkUp session tokens are kept only in memory.
+Your LibreLinkUp password is entered through a masked dialog and saved directly in Windows Credential Manager, not `appsettings.json`. Use the tray's LibreLinkUp sign-out action to remove the active account's saved credential. Cloud session tokens stay in memory. Older LibreLinkUp passwords are migrated out of settings on startup. Dexcom passwords and Nightscout tokens retain their existing Windows DPAPI protection in the settings file.
 
 ## Troubleshooting & FAQ
 

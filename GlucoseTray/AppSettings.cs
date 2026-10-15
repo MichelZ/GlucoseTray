@@ -67,8 +67,6 @@ public class AppSettings
 
     [JsonPropertyOrder(25)]
     public string LibreLinkUpUsername { get; set; } = string.Empty;
-    [JsonPropertyOrder(26)]
-    public string LibreLinkUpPassword { get; set; } = string.Empty;
     [JsonPropertyOrder(27)]
     public string LibreLinkUpRegion { get; set; } = "EU";
     [JsonPropertyOrder(28)]

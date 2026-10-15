@@ -1,28 +1,30 @@
-# LibreLinkUp setup and trial-build notes
+# LibreLinkUp setup
 
-This adds direct LibreLinkUp readings to GlucoseTray's existing numeric tray icon, colour thresholds, stale-reading display, and Windows notifications. It does not require Nightscout.
+GlucoseTray reads shared Libre readings directly from Abbott's cloud, without a Nightscout server.
 
-## Connect your account
+1. Keep the official Libre app collecting and uploading sensor readings on your phone.
+2. In that app, open **Connected Apps > LibreLinkUp > Manage > Add connection** and invite an email address you control for a follower account.
+3. In the official LibreLinkUp phone app, sign in to that follower account, verify the email, accept the sharing invitation and any pending terms. Confirm a current reading appears.
+4. Extract the Windows trial ZIP into its own folder and run `GlucoseTray.exe`. Only run one instance at a time.
+5. When **GlucoseTray — LibreLinkUp sign in** opens, enter your follower email and password and click **Save and connect**. If you cancel, reopen it by right-clicking the tray icon and choosing **LibreLinkUp sign in...**.
+6. Compare the tray reading and time with the official Libre app. The **^** menu beside the clock may hide the icon. Double-click it for full status details.
 
-1. Keep the official Libre app collecting sensor readings on your iPhone and uploading them to Abbott.
-2. In the Libre app, open **Connected Apps > LibreLinkUp > Manage > Add connection** and invite an email address you control for a follower account.
-3. Install the official **LibreLinkUp** phone app, register/sign in to that follower account, verify the email address, accept the invitation and pending terms, and confirm that a current reading appears.
-4. Extract the trial-build ZIP into its own folder. Keep it separate from any existing GlucoseTray installation. Only run one instance at a time.
-5. Edit `appsettings.json` locally, replacing the empty `LibreLinkUpUsername` and `LibreLinkUpPassword` with the follower account credentials. Do not send credentials in chat.
-6. Confirm `DataSource` is `LibreLinkUp`. Use `DisplayUnitType: Mmol` for mmol/L or `Mg` for mg/dL. The trial settings use a one-minute refresh. Select your own high/low thresholds with your care team; the bundled numbers are unchanged upstream defaults.
-7. Launch `GlucoseTray.exe`. If Windows hides the icon, open the **^** tray overflow beside the clock and drag it into the visible tray. Compare the number and reading time with the official Libre app. Double-click the tray number for details.
+## Password storage
 
-The password is encrypted with Windows DPAPI on startup and when saved settings are processed. Session tokens remain in memory. To replace the saved password, replace the entire `ENC:...` value with the new password locally and save. Uninstall by exiting the app, disabling its Run on startup setting if enabled, and removing its extracted folder.
+The dialog masks the password and saves directly to **Windows Credential Manager**, under `GlucoseTray/LibreLinkUp/<follower email>`. It never writes the password to the settings file. Windows protects the saved credential for your Windows user; GlucoseTray reads it to authenticate with Abbott. Cloud session tokens stay in memory.
 
-## Settings
+Only the follower email remains in `appsettings.json`, to select the saved credential. To replace the password, use **LibreLinkUp sign in...** again. **LibreLinkUp sign out** deletes the active account's saved password, clears its account setting, and stops using its cached reading/session. Other accounts' saved credentials are not deleted.
 
-Merge these fields into existing settings if using a source build:
+If an older settings file contains `LibreLinkUpPassword`, startup migrates its plaintext or DPAPI-encrypted value into Credential Manager, then removes the field. A failed vault write leaves the original file intact. Migration does not erase copies already retained by editors or backups.
+
+## Connection and display settings
+
+Only non-password settings belong in `appsettings.json`:
 
 ```json
 {
   "DataSource": "LibreLinkUp",
   "LibreLinkUpUsername": "your-follower-email@example.com",
-  "LibreLinkUpPassword": "your-follower-password",
   "LibreLinkUpRegion": "EU",
   "LibreLinkUpPatientId": "",
   "LibreLinkUpApiVersion": "4.16.0",
@@ -32,22 +34,18 @@ Merge these fields into existing settings if using a source build:
 }
 ```
 
-`EU` is the starting region for this Swiss trial; the client follows up to three known regions returned by Abbott. Supported codes: `AE`, `AP`, `AU`, `CA`, `DE`, `EU`, `EU2`, `FR`, `JP`, `US`, `LA`, `RU`, `CN`. Unknown regions, HTTP redirects, and redirect loops are rejected.
+Merge fields into existing settings rather than replacing thresholds. Use the high/low thresholds agreed with your diabetes team; bundled numbers are upstream defaults. Use `Mmol` for mmol/L or `Mg` for mg/dL. `ServerUnitType` is ignored for LibreLinkUp: the API's `ValueInMgPerDl` is converted independently of account units.
 
-With exactly one shared connection, leave `LibreLinkUpPatientId` empty. With multiple connections, set the exact patient ID returned by `/llu/connections`, or use a dedicated follower account with only your own connection. The app rejects ambiguous or unmatched selections instead of choosing the first patient.
+`EU` is the initial region for the Swiss trial. The client follows bounded region redirects. Supported codes: `AE`, `AP`, `AU`, `CA`, `DE`, `EU`, `EU2`, `FR`, `JP`, `US`, `LA`, `RU`, `CN`. Unknown regions, HTTP redirects, and redirect loops are rejected.
 
-`ServerUnitType` is ignored for LibreLinkUp: the API's `ValueInMgPerDl` is converted independently of the account's display units. `FactoryTimestamp` is parsed as UTC, rather than using the patient's local `Timestamp`. If the cloud stops updating, the last successful reading ages into the existing stale display; refreshing does not make it fresh.
+With one connection, leave `LibreLinkUpPatientId` empty. With multiple connections, use the exact patient ID from `/llu/connections`, or a dedicated follower account with only your own connection. Ambiguous, missing, and unmatched selections clear cached readings. Changing accounts or patients clears old readings, including results arriving after settings changed during a request.
 
-Cached readings are scoped to the configured follower account, region, and patient selection. Changing these clears the previous reading, including when settings change during an in-flight request. Missing, ambiguous, or unmatched connections also clear the cache. A successful automatic patient change resets the glucose alert state.
+## Status, alerts, and limits
 
-Sign-in and setup failures appear in the tray's hover status and double-click details, with one Windows notification per distinct error. Repeated failures do not notify on every poll. A same-patient network outage may retain the last reading with its original timestamp and an error status; no glucose alerts are emitted from failed refreshes. A successful refresh clears the connection error.
+Source UTC measurement time is preserved. An outage for the same patient can retain the last reading with its original timestamp and an error status. It ages into the stale display; polling does not make it fresh. Failed refreshes do not emit glucose alerts. Setup errors appear on hover and double-click, with one Windows notification per distinct error; recovery clears the error.
 
-## Alerts and limits
+Glucose alerts are **Windows notification balloons on alert-level transitions**, not repeating audible alarms. Windows settings affect visibility and sound. Keep official Libre alarms enabled.
 
-GlucoseTray's existing alerts are **Windows notification balloons when entering an alert level**, not a repeating audible alarm. Windows notification settings can affect their visibility and sound. Stale readings do not produce glucose alerts. Keep official Libre alarms enabled.
+The ZIP is an unsigned local trial, not an upstream release. Automated pipeline tests and a synthetic Windows Credential Manager round-trip pass. **Live Swiss Libre 3 Plus connectivity and native tray/audio behavior still require testing.**
 
-This build has automated tests with simulated API responses. **A live Libre 3 Plus / Swiss follower account has not yet been tested**, and the Windows tray UI has not yet been visually tested for this build. The ZIP is a local, unsigned trial build, not an upstream release.
-
-LibreLinkUp uses an unofficial API whose compatibility can change. This implementation follows the protocol documented in the [Nightscout LibreLinkUp uploader](https://github.com/timoschlueter/nightscout-librelink-up): login, API version/product headers, SHA-256 account ID, connections, UTC timestamp, and trend codes. It does not accept terms for you or change sensor settings. Authentication tokens are reused until expiry and renewed once on authentication rejection.
-
-If no reading appears, first check the follower account in the official LibreLinkUp app, accept pending terms, and confirm your credentials and sharing connection. Keep personal readings, passwords, tokens, and account IDs out of any shared logs.
+The unofficial API follows the protocol in the [Nightscout LibreLinkUp uploader](https://github.com/timoschlueter/nightscout-librelink-up); compatibility can change. Complete consent and terms in the official app. GlucoseTray does not accept them or change sensor settings. Keep passwords, tokens, patient identifiers, and personal readings out of shared logs.

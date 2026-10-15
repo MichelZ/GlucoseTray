@@ -27,7 +27,6 @@ public class LibreLinkUpPipelineTests
         var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string,string?> {
             ["DataSource"] = "LibreLinkUp",
             ["LibreLinkUpUsername"] = "synthetic-review@example.test",
-            ["LibreLinkUpPassword"] = "synthetic-password",
             ["LibreLinkUpRegion"] = "EU",
             ["DisplayUnitType"] = "Mmol",
             ["MinutesUntilStale"] = "15",
@@ -41,9 +40,9 @@ public class LibreLinkUpPipelineTests
         foreach(var payload in payloads) cloud.Payloads.Enqueue(payload);
         services.AddSingleton<ITrayIcon>(icon);
         services.AddSingleton(Substitute.For<IScheduler>());
-        var protector = Substitute.For<ICredentialProtector>();
-        protector.Unprotect("synthetic-password").Returns("synthetic-password");
-        services.AddSingleton(protector);
+        var credentials = Substitute.For<ILibreLinkUpCredentialStore>();
+        credentials.GetPassword(Arg.Any<string>()).Returns("synthetic-password");
+        services.AddSingleton(credentials);
         services.AddHttpClient(LibreLinkUpClient.HttpClientName).ConfigurePrimaryHttpMessageHandler(() => cloud);
         return (services.BuildServiceProvider(), config, icon, cloud);
     }
@@ -266,6 +265,21 @@ public class LibreLinkUpPipelineTests
             Assert.That(icon.Last!.DisplayValue, Is.EqualTo("10'0"));
             Assert.That(icon.Last.TimestampUtc, Is.EqualTo(original));
             Assert.That(icon.Last.ConnectionError, Is.Not.Empty);
+        }
+    }
+
+    [Test]
+    public async Task RemovingStoredCredentialMustInvalidateSessionAndCachedReading()
+    {
+        var (services,_,icon,_) = Build(Login(), Reading(180));
+        using (services)
+        {
+            var app = services.GetRequiredService<AppRunner>();
+            await app.Process();
+            services.GetRequiredService<ILibreLinkUpCredentialStore>().GetPassword(Arg.Any<string>()).Returns((string?)null);
+            await app.Process();
+            Assert.That(icon.Last!.DisplayValue, Is.EqualTo("NUL"));
+            Assert.That(icon.Last.ConnectionError, Does.Contain("signed out"));
         }
     }
 

@@ -17,7 +17,6 @@ public class LibreLinkUpClientTests
     {
         DataSource = GlucoseSource.LibreLinkUp,
         LibreLinkUpUsername = "follower@example.test",
-        LibreLinkUpPassword = "ENC:test-password",
         LibreLinkUpRegion = "EU",
     };
 
@@ -44,9 +43,9 @@ public class LibreLinkUpClientTests
             handler.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(response) });
         var factory = Substitute.For<IHttpClientFactory>();
         factory.CreateClient(LibreLinkUpClient.HttpClientName).Returns(_ => new HttpClient(handler, disposeHandler: false));
-        var protector = Substitute.For<ICredentialProtector>();
-        protector.Unprotect("ENC:test-password").Returns("test-password");
-        return (new LibreLinkUpClient(factory, protector), handler);
+        var credentials = Substitute.For<ILibreLinkUpCredentialStore>();
+        credentials.GetPassword(Arg.Any<string>()).Returns("test-password");
+        return (new LibreLinkUpClient(factory, credentials), handler);
     }
 
     [Test]
@@ -80,7 +79,7 @@ public class LibreLinkUpClientTests
     }
 
     [Test]
-    public async Task ShouldSendRequiredHeadersAndDecryptedPasswordAndReuseToken()
+    public async Task ShouldSendRequiredHeadersAndStoredPasswordAndReuseToken()
     {
         var (client, handler) = Create(Login(), Connections(), Connections());
         await client.GetLatestGlucoseAsync(Settings());
@@ -221,6 +220,25 @@ public class LibreLinkUpClientTests
         var settings = Settings();
         settings.LibreLinkUpPatientId = "other-patient";
         Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(settings));
+    }
+
+    [Test]
+    public async Task SavingNewCredentialMustRenewCachedSession()
+    {
+        var (_, handler) = Create(Login(), Connections(), Login(), Connections());
+        var factory = Substitute.For<IHttpClientFactory>();
+        factory.CreateClient(LibreLinkUpClient.HttpClientName).Returns(_ => new HttpClient(handler, false));
+        var store = Substitute.For<ILibreLinkUpCredentialStore>();
+        store.GetPassword(Arg.Any<string>()).Returns("first-password");
+        var client = new LibreLinkUpClient(factory, store);
+        await client.GetLatestGlucoseAsync(Settings());
+        store.Revision.Returns(1L);
+        store.GetPassword(Arg.Any<string>()).Returns("replacement-password");
+        await client.GetLatestGlucoseAsync(Settings());
+        var logins = handler.Requests.Where(r => r.Uri.AbsolutePath == "/llu/auth/login").ToList();
+        Assert.That(logins, Has.Count.EqualTo(2));
+        using var body = JsonDocument.Parse(logins[1].Body!);
+        Assert.That(body.RootElement.GetProperty("password").GetString(), Is.EqualTo("replacement-password"));
     }
 
     private sealed record SentRequest(Uri Uri, Dictionary<string, string> Headers, string? Body);
