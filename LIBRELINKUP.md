@@ -50,6 +50,6 @@ Source UTC measurement time is preserved. An outage for the same patient can ret
 
 Glucose alerts are **Windows notification balloons on alert-level transitions**, not repeating audible alarms. Windows settings affect visibility and sound. Keep official Libre alarms enabled.
 
-The ZIP is an unsigned local trial, not an upstream release. Automated pipeline tests and a synthetic Windows Credential Manager round-trip pass. **Live Swiss Libre 3 Plus connectivity and native tray/audio behavior still require testing.**
+The ZIP is an unsigned local trial, not an upstream release. The 163-test suite includes production-DI cloud scenarios, a synthetic Windows Credential Manager round-trip, actual native icon colors and handle lifetime, background-thread display refresh, widget reopen behavior, and stale-data status checks. Live Swiss account login and shared-connection polling have been verified locally. Native widget states were rendered and inspected; Windows notification sound, sleep/resume, and mixed-DPI/multiple-monitor behavior still need manual validation.
 
 The unofficial API follows the protocol in the [Nightscout LibreLinkUp uploader](https://github.com/timoschlueter/nightscout-librelink-up); compatibility can change. Complete consent and terms in the official app. GlucoseTray does not accept them or change sensor settings. Keep passwords, tokens, patient identifiers, and personal readings out of shared logs.
