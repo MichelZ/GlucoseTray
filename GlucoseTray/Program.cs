@@ -5,6 +5,7 @@ using GlucoseTray;
 using GlucoseTray.Display;
 using System.Text.Json;
 using GlucoseTray.Read;
+using GlucoseTray.Read.LibreLinkUp;
 
 public class Program
 {
@@ -30,6 +31,9 @@ public class Program
     private static void ConfigureServices(IConfiguration configuration, IServiceCollection services)
     {
         services.AddHttpClient(ExternalCommunicationAdapter.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15));
+        services.AddHttpClient(LibreLinkUpClient.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(15))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddSingleton<ILibreLinkUpClient, LibreLinkUpClient>();
 
         services.AddSingleton<ICredentialProtector, DpapiCredentialProtector>();
         services.AddSingleton<ICredentialMigrator, CredentialMigrator>();
