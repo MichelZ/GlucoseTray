@@ -40,14 +40,28 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
 
     public async Task<GlucoseReading> GetLatestGlucoseAsync(AppSettings settings)
     {
+        try { return await ReadAsync(settings); }
+        catch (GlucoseReadException) { throw; }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            throw new GlucoseReadException("LibreLinkUp sign-in failed. Check your follower credentials and sign in to the official LibreLinkUp app.");
+        }
+        catch (Exception)
+        {
+            throw new GlucoseReadException("LibreLinkUp could not update. Check your internet connection and sign in to the official LibreLinkUp app to complete any pending setup.");
+        }
+    }
+
+    private async Task<GlucoseReading> ReadAsync(AppSettings settings)
+    {
         var identity = new SessionIdentity(settings.LibreLinkUpUsername.Trim(), settings.LibreLinkUpPassword,
             settings.LibreLinkUpRegion.Trim().ToUpperInvariant(), settings.LibreLinkUpApiVersion.Trim());
         if (string.IsNullOrWhiteSpace(identity.Username) || string.IsNullOrWhiteSpace(identity.Password))
-            throw new InvalidOperationException("Set LibreLinkUpUsername and LibreLinkUpPassword to your LibreLinkUp follower account credentials.");
+            throw new GlucoseReadException("Set LibreLinkUpUsername and LibreLinkUpPassword to your LibreLinkUp follower account credentials.", false);
         if (!Hosts.ContainsKey(identity.Region))
-            throw new InvalidOperationException("Unsupported LibreLinkUpRegion. See the README for supported region codes.");
+            throw new GlucoseReadException("Unsupported LibreLinkUpRegion. See the README for supported region codes.", false);
         if (!Version.TryParse(identity.Version, out _))
-            throw new InvalidOperationException("LibreLinkUpApiVersion must be an app version such as 4.16.0.");
+            throw new GlucoseReadException("LibreLinkUpApiVersion must be an app version such as 4.16.0.", false);
 
         if (_identity != identity)
         {
@@ -66,7 +80,7 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
                 using var response = await SendAsync(client, identity, HttpMethod.Get, _host!, "/llu/connections", authenticated: true);
                 var connections = RequireData(response);
                 var measurement = SelectMeasurement(connections, settings.LibreLinkUpPatientId);
-                return MapMeasurement(measurement);
+                return measurement;
             }
             catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
@@ -147,29 +161,42 @@ public sealed class LibreLinkUpClient(IHttpClientFactory httpClientFactory, ICre
         if (code == 2)
             throw new HttpRequestException("LibreLinkUp authentication was rejected. Check your credentials in the official app.", null, HttpStatusCode.Unauthorized);
         if (code != 0)
-            throw new InvalidOperationException($"LibreLinkUp returned status {code}. Open the official LibreLinkUp app and complete any pending consent, email verification, or terms acceptance.");
+            throw new GlucoseReadException($"LibreLinkUp returned status {code}. Open the official LibreLinkUp app and complete any pending consent, email verification, or terms acceptance.");
         if (!root.TryGetProperty("data", out var data) || data.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array))
             throw new InvalidOperationException("LibreLinkUp returned no data.");
         return data;
     }
 
-    private static JsonElement SelectMeasurement(JsonElement connections, string patientId)
+    private static GlucoseReading SelectMeasurement(JsonElement connections, string patientId)
     {
         if (connections.ValueKind != JsonValueKind.Array || connections.GetArrayLength() == 0)
-            throw new InvalidOperationException("No LibreLinkUp connections found. Accept your sharing invitation in the official LibreLinkUp app first.");
+            throw new GlucoseReadException("No LibreLinkUp connections found. Accept your sharing invitation in the official LibreLinkUp app first.", false);
         patientId = patientId.Trim();
         if (patientId.Length == 0 && connections.GetArrayLength() != 1)
-            throw new InvalidOperationException("Multiple LibreLinkUp connections found. Set LibreLinkUpPatientId to select one; no reading was selected automatically.");
+            throw new GlucoseReadException("Multiple LibreLinkUp connections found. Set LibreLinkUpPatientId to select one; no reading was selected automatically.", false);
         foreach (var connection in connections.EnumerateArray())
         {
-            if (patientId.Length == 0 || connection.GetProperty("patientId").GetString() == patientId)
+            if (connection.ValueKind != JsonValueKind.Object ||
+                !connection.TryGetProperty("patientId", out var id) || id.ValueKind != JsonValueKind.String ||
+                string.IsNullOrWhiteSpace(id.GetString()))
+                throw new GlucoseReadException("LibreLinkUp returned a connection without a patient ID. Check sharing in the official app.", false);
+            if (patientId.Length == 0 || id.GetString() == patientId)
             {
-                if (connection.TryGetProperty("glucoseMeasurement", out var measurement) && measurement.ValueKind == JsonValueKind.Object)
-                    return measurement;
-                throw new InvalidOperationException("The selected LibreLinkUp connection has no glucose reading yet.");
+                try
+                {
+                    if (!connection.TryGetProperty("glucoseMeasurement", out var measurement) || measurement.ValueKind != JsonValueKind.Object)
+                        throw new InvalidOperationException("No measurement.");
+                    var reading = MapMeasurement(measurement);
+                    reading.SubjectId = id.GetString();
+                    return reading;
+                }
+                catch (Exception)
+                {
+                    throw new GlucoseReadException("LibreLinkUp has no usable reading for the selected patient. Check the official app and sensor connection.", subjectId: id.GetString());
+                }
             }
         }
-        throw new InvalidOperationException("LibreLinkUpPatientId does not match a shared connection.");
+        throw new GlucoseReadException("LibreLinkUpPatientId does not match a shared connection.", false);
     }
 
     private static GlucoseReading MapMeasurement(JsonElement measurement)

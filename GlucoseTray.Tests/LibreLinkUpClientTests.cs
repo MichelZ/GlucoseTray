@@ -115,7 +115,7 @@ public class LibreLinkUpClientTests
     {
         var redirect = JsonSerializer.Serialize(new { status = 0, data = new { redirect = true, region } });
         var (client, handler) = Create(redirect);
-        Assert.ThrowsAsync<InvalidOperationException>(() => client.GetLatestGlucoseAsync(Settings()));
+        Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()));
         Assert.That(handler.Requests, Has.Count.EqualTo(1));
     }
 
@@ -155,7 +155,7 @@ public class LibreLinkUpClientTests
     public void ShouldNotSilentlySelectFirstOfMultiplePatients()
     {
         var (client, _) = Create(Login(), Connections(count: 2));
-        Assert.That(Assert.ThrowsAsync<InvalidOperationException>(() => client.GetLatestGlucoseAsync(Settings()))!.Message, Does.Contain("LibreLinkUpPatientId"));
+        Assert.That(Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()))!.Message, Does.Contain("LibreLinkUpPatientId"));
     }
 
     [Test]
@@ -174,7 +174,7 @@ public class LibreLinkUpClientTests
     public void ShouldRejectMissingDataAndConsentErrorsWithoutLoggingBodies(string response)
     {
         var (client, _) = Create(Login(), response);
-        var error = Assert.ThrowsAsync<InvalidOperationException>(() => client.GetLatestGlucoseAsync(Settings()));
+        var error = Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()));
         Assert.That(error!.ToString(), Does.Not.Contain("do-not-log"));
     }
 
@@ -186,20 +186,23 @@ public class LibreLinkUpClientTests
     public void ShouldRejectInvalidValuesAndTimes(int? mg, string? timestamp)
     {
         var (client, _) = Create(Login(), Connections(mg, timestamp));
-        Assert.ThrowsAsync<InvalidOperationException>(() => client.GetLatestGlucoseAsync(Settings()));
+        Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()));
     }
 
     [Test]
     public async Task ShouldPreserveLastReadingAndItsAgeWhenCloudFailsThroughFactory()
     {
-        var (client, _) = Create(Login(), Connections(), """{"status":0,"data":[]}""");
+        var (client, handler) = Create(Login(), Connections());
+        handler.Responses.Enqueue(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
         var options = Substitute.For<IOptionsMonitor<AppSettings>>();
         options.CurrentValue.Returns(Settings());
         var factory = new ReadStrategyFactory(options, Substitute.For<IExternalCommunicationAdapter>(), Substitute.For<IGlucoseReadingMapper>(), Substitute.For<ICredentialProtector>(), client);
         var reader = new GlucoseReader(factory, NullLogger<GlucoseReader>.Instance);
         var first = await reader.GetLatestGlucoseAsync();
         var fallback = await reader.GetLatestGlucoseAsync();
-        Assert.That(fallback, Is.SameAs(first));
+        Assert.That(fallback.TimestampUtc, Is.EqualTo(first.TimestampUtc));
+        Assert.That(fallback.MgValue, Is.EqualTo(first.MgValue));
+        Assert.That(fallback.ConnectionError, Is.Not.Empty);
         Assert.That(fallback.TimestampUtc, Is.LessThan(DateTime.UtcNow.AddMinutes(-15)));
     }
 
@@ -207,7 +210,7 @@ public class LibreLinkUpClientTests
     public void ShouldBoundRetriesWhenAuthenticationKeepsFailing()
     {
         var (client, handler) = Create("""{"status":2}""", """{"status":2}""");
-        Assert.ThrowsAsync<HttpRequestException>(() => client.GetLatestGlucoseAsync(Settings()));
+        Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(Settings()));
         Assert.That(handler.Requests, Has.Count.EqualTo(2));
     }
 
@@ -217,7 +220,7 @@ public class LibreLinkUpClientTests
         var (client, _) = Create(Login(), Connections());
         var settings = Settings();
         settings.LibreLinkUpPatientId = "other-patient";
-        Assert.ThrowsAsync<InvalidOperationException>(() => client.GetLatestGlucoseAsync(settings));
+        Assert.ThrowsAsync<GlucoseReadException>(() => client.GetLatestGlucoseAsync(settings));
     }
 
     private sealed record SentRequest(Uri Uri, Dictionary<string, string> Headers, string? Body);

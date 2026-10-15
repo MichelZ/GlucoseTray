@@ -60,6 +60,8 @@ public class NotificationIcon : ITrayIcon
     public void RefreshIcon(GlucoseDisplay display)
     {
         _latestGlucose = display;
+        var status = display.GetDisplayMessage(DateTime.UtcNow);
+        _trayIcon.Text = status.Length <= 63 ? status : status[..60] + "...";
         CreateTextIcon(display);
     }
 

@@ -38,6 +38,10 @@ With exactly one shared connection, leave `LibreLinkUpPatientId` empty. With mul
 
 `ServerUnitType` is ignored for LibreLinkUp: the API's `ValueInMgPerDl` is converted independently of the account's display units. `FactoryTimestamp` is parsed as UTC, rather than using the patient's local `Timestamp`. If the cloud stops updating, the last successful reading ages into the existing stale display; refreshing does not make it fresh.
 
+Cached readings are scoped to the configured follower account, region, and patient selection. Changing these clears the previous reading, including when settings change during an in-flight request. Missing, ambiguous, or unmatched connections also clear the cache. A successful automatic patient change resets the glucose alert state.
+
+Sign-in and setup failures appear in the tray's hover status and double-click details, with one Windows notification per distinct error. Repeated failures do not notify on every poll. A same-patient network outage may retain the last reading with its original timestamp and an error status; no glucose alerts are emitted from failed refreshes. A successful refresh clears the connection error.
+
 ## Alerts and limits
 
 GlucoseTray's existing alerts are **Windows notification balloons when entering an alert level**, not a repeating audible alarm. Windows notification settings can affect their visibility and sound. Stale readings do not produce glucose alerts. Keep official Libre alarms enabled.
