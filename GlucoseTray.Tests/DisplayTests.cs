@@ -24,7 +24,7 @@ public class DisplayTests
               .WithMmolDisplay()
               .WithMmolValue(5.5f)
               .When.RefreshingIcon()
-              .Then.ShouldBeRefreshedWithValue("5'5");
+              .Then.ShouldBeRefreshedWithValue("5.5");
     }
 
     [Test]
@@ -384,7 +384,7 @@ public class DisplayTests
                   .WithMmolDisplay()
                   .WithMmolValue(5.5f)
                   .When.RefreshingIcon()
-                  .Then.ShouldBeRefreshedWithValue("5'5");
+                  .Then.ShouldBeRefreshedWithValue("5.5");
         }
         finally
         {

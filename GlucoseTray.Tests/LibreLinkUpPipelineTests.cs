@@ -54,7 +54,7 @@ public class LibreLinkUpPipelineTests
         using(services) {
             await services.GetRequiredService<AppRunner>().Process();
             using(Assert.EnterMultipleScope()) {
-                Assert.That(icon.Last!.DisplayValue, Is.EqualTo("10'0"));
+                Assert.That(icon.Last!.DisplayValue, Is.EqualTo("10.0"));
                 Assert.That(icon.Last.IsStale, Is.False);
                 Assert.That(icon.Last.Trend, Is.EqualTo(Trend.FortyFiveUp));
                 Assert.That(icon.Notifications, Is.Empty);
@@ -181,7 +181,7 @@ public class LibreLinkUpPipelineTests
             var app = services.GetRequiredService<AppRunner>();
             await app.Process(); await app.Process();
             Assert.That(icon.Last!.ConnectionError, Is.Null);
-            Assert.That(icon.Last.DisplayValue, Is.EqualTo("10'0"));
+            Assert.That(icon.Last.DisplayValue, Is.EqualTo("10.0"));
             Assert.That(icon.Notifications, Has.Count.EqualTo(1));
         }
     }
@@ -262,7 +262,7 @@ public class LibreLinkUpPipelineTests
             var app = services.GetRequiredService<AppRunner>();
             await app.Process(); var original = icon.Last!.TimestampUtc;
             await app.Process();
-            Assert.That(icon.Last!.DisplayValue, Is.EqualTo("10'0"));
+            Assert.That(icon.Last!.DisplayValue, Is.EqualTo("10.0"));
             Assert.That(icon.Last.TimestampUtc, Is.EqualTo(original));
             Assert.That(icon.Last.ConnectionError, Is.Not.Empty);
         }
