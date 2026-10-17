@@ -85,6 +85,9 @@ Logs exclude request URLs, headers, bodies, settings, and raw exception text. Th
 
 ## Troubleshooting & FAQ
 
+**The app disappeared or stopped unexpectedly.**
+The app folder contains `lifecycle.log` (and one rotated backup, `lifecycle.log.1`). It records UTC times, process IDs, and fixed lifecycle event names for startup, the Exit menu, Windows logoff/shutdown, suspend/resume, and unexpected failures. It never includes settings, glucose readings, account details, URLs, or exception messages. On the next launch, `PreviousRunUnclean` means a previous process ended without recording a clean completion; it cannot identify which program terminated it. The small `lifecycle-*.pending` files support this detection and contain no credentials. Diagnostics are best-effort if the folder is not writable.
+
 **The number stopped updating.**
 Hover over the icon to check the reading time. If it's old, the app may have lost its connection or crashed — close it from the taskbar and start it again.
 

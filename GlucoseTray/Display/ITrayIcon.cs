@@ -29,10 +29,12 @@ public class NotificationIcon : ITrayIcon
     private readonly IWidgetPositionStore _widgetPositions;
 
     private readonly ILibreLinkUpSignIn? _signIn;
+    private readonly LifecycleDiagnostics? _lifecycle;
 
     public NotificationIcon(ILibreLinkUpSignIn? signIn = null, IOptionsMonitor<AppSettings>? options = null,
-        IWidgetPositionStore? widgetPositions = null)
+        IWidgetPositionStore? widgetPositions = null, LifecycleDiagnostics? lifecycle = null)
     {
+        _lifecycle = lifecycle;
         _widgetPositions = widgetPositions ?? new WidgetPositionStore(Path.Combine(AppContext.BaseDirectory, WidgetPositionStore.FileName));
         _ = _dispatcher.Handle;
         _widgetEnabled = options?.CurrentValue.ShowGlucoseWidget ?? false;
@@ -117,6 +119,7 @@ public class NotificationIcon : ITrayIcon
 
     private void Exit(object? sender, EventArgs e)
     {
+        _lifecycle?.Record(LifecycleEvent.ExitMenuRequested);
         Dispose();
         Application.ExitThread();
         Application.Exit();

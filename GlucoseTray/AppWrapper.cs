@@ -2,12 +2,12 @@
 
 public class AppWrapper : ApplicationContext
 {
-    public AppWrapper(AppRunner app)
+    public AppWrapper(AppRunner app, LifecycleDiagnostics? lifecycle = null)
     {
-        _ = RunAsync(app);
+        _ = RunAsync(app, lifecycle);
     }
 
-    private static async Task RunAsync(AppRunner app)
+    private static async Task RunAsync(AppRunner app, LifecycleDiagnostics? lifecycle)
     {
         try
         {
@@ -15,6 +15,7 @@ public class AppWrapper : ApplicationContext
         }
         catch
         {
+            lifecycle?.Failure(LifecycleEvent.RefreshLoopFailed);
             // AppRunner already logs the fatal error and disposes the tray;
             // ensure the WinForms message loop shuts down cleanly.
             Application.Exit();

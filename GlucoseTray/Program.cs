@@ -12,6 +12,22 @@ public class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        using var lifecycle = new LifecycleDiagnostics(AppContext.BaseDirectory);
+        try
+        {
+            lifecycle.Attach();
+            Run(lifecycle);
+            lifecycle.Complete();
+        }
+        catch
+        {
+            lifecycle.Failure(LifecycleEvent.MainFailed);
+            throw;
+        }
+    }
+
+    private static void Run(LifecycleDiagnostics lifecycle)
+    {
         var filePath = AppSettings.FileName;
         if (!File.Exists(filePath))
             CreateDefaultAppSettings(filePath);
@@ -22,7 +38,11 @@ public class Program
 
         var host = Host.CreateDefaultBuilder()
             .ConfigureAppConfiguration((context, builder) => builder.AddJsonFile(AppSettings.FileName, optional: false, reloadOnChange: true))
-            .ConfigureServices(static (context, services) => ConfigureServices(context.Configuration, services))
+            .ConfigureServices((context, services) =>
+            {
+                services.AddSingleton(lifecycle);
+                ConfigureServices(context.Configuration, services);
+            })
             .Build();
 
         var services = host.Services;
